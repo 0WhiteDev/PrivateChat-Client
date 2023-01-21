@@ -15,7 +15,6 @@ public class SoundNotify {
             clip.open(audioIn);
             FloatControl gainControl = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
             float gain = 0.15F;
-            System.out.println(gain);
             float dB = (float) (Math.log(gain) / Math.log(10.0) * 20.0);
             gainControl.setValue(dB);
             clip.start();
