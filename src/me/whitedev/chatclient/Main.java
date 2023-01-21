@@ -1,5 +1,6 @@
 package me.whitedev.chatclient;
 
+import java.awt.event.ItemEvent;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -10,10 +11,11 @@ import javax.swing.*;
 
 public class Main {
 
-    String version = "v1.0";
+    public static String VERSION = "v1.1";
+    boolean sound = true;
     BufferedReader in;
     PrintWriter out;
-    JFrame frame = new JFrame("PrivateChat Client " + version);
+    static JFrame frame = new JFrame("PrivateChat Client " + VERSION);
     String username;
     JTextField textField = new JTextField(20);
     JTextArea messageArea = new JTextArea(25, 40);
@@ -21,9 +23,15 @@ public class Main {
     JPanel optionsPanel = new JPanel();
     JPanel chatPanel = new JPanel();
     JButton button1 = new JButton("Disconnect");
+    JButton button2 = new JButton("Join to ChatRoom");
+    JCheckBox checkBox = new JCheckBox("Message Sound");
+    Encryption encryption = new Encryption();
+    Announcement announcement = new Announcement();
+    SoundNotify soundNotify = new SoundNotify();
 
     public Main() {
 
+        //Layout of Gui
         textField.setEditable(true);
         messageArea.setEditable(false);
 
@@ -31,68 +39,85 @@ public class Main {
         chatPanel.add(textField);
         chatPanel.add(new JScrollPane(messageArea));
         chatPanel.add(button1, 2);
-        button1.setLocation(400, 20);
+        chatPanel.add(button2, 2);
+
+        checkBox.setSelected(true);
+
         optionsPanel.add(new JLabel("Options"));
+        optionsPanel.add(checkBox);
+
         tabbedPane.addTab("Chat", chatPanel);
         tabbedPane.addTab("Options", optionsPanel);
+
+        frame.setSize(500, 520);
         frame.add(tabbedPane);
         frame.setVisible(true);
-        frame.setSize(500, 500);
 
+        // Listener for TextBox (TextField)
         textField.addActionListener(e -> {
             if(!textField.getText().equals("")) {
-                out.println(encrypt("[" + username + "] " + textField.getText()));
+                out.println(encryption.encrypt("[" + username + "] " + textField.getText()));
                 textField.setText("");
             }
         });
 
+        // Listener for Buttons
         button1.addActionListener(e -> {
             try {
+                out.println(encryption.encrypt("[" + username + " Left the ChatRoom] "));
                 messageArea.setText("");
                 run();
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
         });
+
+        button2.addActionListener(e -> {
+            try {
+                run();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+        });
+
+        //Listener for CheckBox
+        checkBox.addItemListener(e -> sound = e.getStateChange() == ItemEvent.SELECTED);
+
     }
 
-    private String[] getServerAddress() {
-        return JOptionPane.showInputDialog(
-                frame,
-                "Enter IP Address of the ChatRoom: (Example 127.0.0.1:8888)",
-                "Welcome to the PrivateChat",
-                JOptionPane.QUESTION_MESSAGE).split(":");
-    }
-
-    private String getName() {
-        return JOptionPane.showInputDialog(
-                frame,
-                "Enter your Username:",
-                "Username Selection",
-                JOptionPane.QUESTION_MESSAGE);
-    }
 
     private void run() throws IOException {
         button1.setVisible(false);
-        String[] serverAddress = getServerAddress();
+        button2.setVisible(true);
+
+        String[] serverAddress = announcement.getServerAddress();
+
         while (serverAddress.length == 1) {
-            serverAddress = getServerAddress();
+            serverAddress = announcement.getServerAddress();
         }
+
         Socket socket = new Socket(serverAddress[0], Integer.parseInt(serverAddress[1]));
-        username = getName();
+        username = announcement.getName();
         if (username == null || username.equals("")) {
             username = "User" + new Random().nextInt(1000);
         }
+
         in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
         out = new PrintWriter(socket.getOutputStream(), true);
         messageArea.setText("[System] Welcome on private chat! - " + serverAddress[0] + ":" + serverAddress[1]);
+
+        button2.setVisible(false);
         button1.setVisible(true);
+
+        out.println(encryption.encrypt("[" + username + " Joined the ChatRoom] "));
+
         new Thread(() -> {
             String message;
             try {
                 while ((message = in.readLine()) != null) {
-                    if(decrypt(message).startsWith("["))
-                        messageArea.setText(decrypt(message) + "\n" + messageArea.getText());
+                    if(encryption.decrypt(message).startsWith("["))
+                        if(sound) soundNotify.getMessage();
+                        messageArea.setText(encryption.decrypt(message) + "\n" + messageArea.getText());
                 }
             } catch (Exception ex) {
                 ex.printStackTrace();
@@ -102,27 +127,9 @@ public class Main {
 
     public static void main(String[] args) throws Exception {
         Main client = new Main();
-        client.frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        client.frame.setVisible(true);
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setVisible(true);
         client.run();
-    }
-
-    static StringBuilder builder = new StringBuilder();
-
-    static String encrypt(Object input) {
-        builder.setLength(0);
-        for (char object : String.valueOf(input).toCharArray()) {
-            builder.append(Character.toChars(object * 354));
-        }
-        return builder.toString();
-    }
-
-    static String decrypt(Object input) {
-        builder.setLength(0);
-        for (char object : String.valueOf(input).toCharArray()) {
-            builder.append(Character.toChars(object / 354));
-        }
-        return builder.toString();
     }
 
 }
